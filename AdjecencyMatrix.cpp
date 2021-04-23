@@ -3,6 +3,7 @@
 #include <iostream>
 #include <math.h>
 #include <string.h>
+#include <queue>
 
 using namespace std;
 
@@ -39,26 +40,39 @@ static int AdjacencyMatrix__init__(AdjacencyMatrix *self, PyObject *args) {
             self->vertices = self->vertices | mask; 
         }
         int position = 0, line = 1; 
+        int j;
         for(int i = 1; i < length; i++){
             a = graph[i] - 63;
-            a << 2; 
+            a = a << 2; 
+            j = 0; 
             do
             {
                 if(a & (1 << 7))
-                    self->matrix[line] = self->matrix[line] | (1 << (63 - position));
+                {
+                    self->matrix[line] = self->matrix[line] | ((_int64)1 << (63 - position));
+                    self->matrix[position] = self->matrix[position] | ((_int64)1 << (63 - line));
+                }
                 position++;
                 if(position == line)
                 { 
                     position = 0;
                     line++;
                 }
-            } while (a = a << 1);
+                a = a << 1;
+                j++; 
+            } while (j < 6);
         }
     }
     else {
         self->vertices = 0; 
     }
     return 0;
+}
+
+static PyObject *matrix(AdjacencyMatrix *self, PyObject*args) {
+    int vertex; 
+    PyArg_ParseTuple(args, "i", &vertex);
+    return PyLong_FromLongLong(self->matrix[vertex]);
 }
 
 static PyObject *number_of_vertices(AdjacencyMatrix *self) {
@@ -92,10 +106,17 @@ static PyObject *vertex_degree( AdjacencyMatrix *self, PyObject*args)
     PyArg_ParseTuple(args, "i", &vertex);
     _int64 neighbours = self->matrix[vertex];
     int result = 0;
+    //int i = 0; 
     do 
     {
-        result += neighbours % 2;
-    } while( neighbours = neighbours >> 1 );
+        //i++;
+        if(neighbours & ((_int64)1 << 63))
+        {
+            result++;
+        }
+        //result += neighbours % 2;
+        neighbours = neighbours << 1;
+    } while( neighbours );
 
     return PyLong_FromLong(result); 
 } 
@@ -106,13 +127,17 @@ static PyObject *vertex_neighbors( AdjacencyMatrix *self, PyObject*args)
     PyArg_ParseTuple(args, "i", &vertex);
     _int64 neighbours = self->matrix[vertex];
     PyObject*set = PySet_New(nullptr);
-    int i = 1; 
+    int i = 0; 
     do 
     {
-        if(neighbours % 2)
-        PySet_Add(set, PyLong_FromLong(i));
-        i++; 
-    } while( neighbours = neighbours >> 1 );
+        if(neighbours & ((_int64)1 << 63))
+        {
+            PySet_Add(set, PyLong_FromLong(i));
+        }
+        //result += neighbours % 2;
+        i++;
+        neighbours = neighbours << 1;
+    } while( neighbours );
 
     return set;
 } 
@@ -121,12 +146,9 @@ static PyObject *add_vertex( AdjacencyMatrix *self, PyObject*args)
 {
     int v; 
     PyArg_ParseTuple(args, "i", &v);
-    if(v<64)
-    {
-        
-        _int64 mask = (_int64) 1 << v;  
-        self->vertices = self->vertices | mask;  
-    }
+ 
+    self->vertices = self->vertices | ((_int64) 1 << v);  
+    
     Py_RETURN_NONE;
 }
 
@@ -134,33 +156,32 @@ static PyObject *delete_vertex( AdjacencyMatrix *self, PyObject*args)
 {
     int v; 
     PyArg_ParseTuple(args, "i", &v);
-    if(v<64)
+    
+    self->matrix[v] = 0;
+    _int64 mask;
+    if(v<63 ) mask = ( ~ ((_int64)1 << (63-v))); 
+    else mask = ( ~ ((_int64)1)); 
+    self->vertices = (self->vertices ^ (_int64)1 << v);
+    for(int i = 0; i < 64; i++)
     {
-        self->matrix[v] = 0;
-        _int64 mask = (~0) ^ (1 << v); 
-        self->vertices = self->vertices & mask;
-        for(int i = 0; i < 64; i++)
-        {
-            self->matrix[v] = self->matrix[v] & mask;
-        }
-        
-    }
+        self->matrix[i] = self->matrix[i] & mask;
+    }  
+    
     Py_RETURN_NONE;
 }
+
 
 static PyObject *number_of_edges( AdjacencyMatrix *self)
     {
         int sum = 0;
         for(int i = 1; i < 64; i++)
         {
-            int j =0;
             _int64 neighbours = self->matrix[i];
             int result = 0;
-            for(int j = 0; j < i; j++ );
+            for(int j = 0; j < i; j++ )
             {
-                sum += neighbours % 2;
-                neighbours = neighbours >> 1;
-                j++;
+                if(neighbours & ((_int64)1 << (63 - j)))
+                    sum ++;
             }
         }
         return PyLong_FromLong(sum);
@@ -169,14 +190,13 @@ static PyObject *number_of_edges( AdjacencyMatrix *self)
 static PyObject *edges(AdjacencyMatrix *self)
     {
         _int64 vertices = self->vertices;
-        PyObject*set = PySet_New(nullptr);
-        int i = 1; 
+        PyObject*set = PySet_New(nullptr); 
         
         int position = 0, line = 1; 
         do
             {
                 
-                if(self->matrix[line] & (1 << (63 - position)))
+                if(self->matrix[line] & ((_int64)1 << (63-position)))
                 {
                     PyObject*edge;
                     edge = PyTuple_New(2);
@@ -198,16 +218,19 @@ static PyObject *edges(AdjacencyMatrix *self)
     {
     int v, u; 
     PyArg_ParseTuple(args, "ii", &v, &u);
-        _int64 mask = (~0) ^ (1 << v); 
-        return PyBool_FromLong(self->matrix[u] & mask);
+        _int64 mask = ((_int64)1 << (63-v)); 
+        _int64 mask2 = ((_int64)1 << (63-u)); 
+        if(self->matrix[u] & mask) return PyBool_FromLong(1);
+        else if(self->matrix[v] & mask2) return PyBool_FromLong(1);
+        else return PyBool_FromLong(0);
     }
 
 static PyObject *add_edge( AdjacencyMatrix *self,  PyObject*args)
 {
     int v, u; 
     PyArg_ParseTuple(args, "ii", &v, &u);
-    _int64 mask1 = 1 << (63-v); 
-    _int64 mask2 = 1 << (63-u);
+    _int64 mask1 = (_int64)1 << (63-v); 
+    _int64 mask2 = (_int64)1 << (63-u);
     self->matrix[u] = self->matrix[u] | mask1;
     self->matrix[v] = self->matrix[v] | mask2;  
      Py_RETURN_NONE;
@@ -217,8 +240,8 @@ static PyObject *delete_edge( AdjacencyMatrix *self,  PyObject*args)
 {
     int v, u; 
     PyArg_ParseTuple(args, "ii", &v, &u);
-    _int64 mask1 = (~0) ^ (1 << (63-v)); 
-    _int64 mask2 = (~0) ^ (1 << (63-u)); 
+    _int64 mask1 = (~(_int64)0) ^ ((_int64)1 << (63-v)); 
+    _int64 mask2 = (~(_int64)0) ^ ((_int64)1 << (63-u)); 
     self->matrix[u] = self->matrix[u] & mask1;
     self->matrix[v] = self->matrix[v] & mask2;
      Py_RETURN_NONE;
@@ -226,23 +249,79 @@ static PyObject *delete_edge( AdjacencyMatrix *self,  PyObject*args)
 
 static PyObject *is_complete_bipartite( AdjacencyMatrix *self)
 {
-    for(int i = 1; i<64; i++)
+    _int64 mask = (_int64)1 << 63;
+    _int64 coloring = mask;
+    _int64 colored = mask; 
+    int color1 = 1;
+    int color0 = 0; 
+    queue <int> q;
+    q.push(0);
+    _int64 vertex;
+
+    while(!q.empty())
     {
-        _int64 mask = (~0) ^ (1 << i); 
-        for(int j = 0; j<i; j++)
+        vertex  = q.front();
+        q.pop();
+        _int64 neighbors = self->matrix[vertex]; 
+        for(int i=0; i<64; i++)
         {
-            if(self->matrix[j] & mask)
-            {
-                if(self->matrix[i] & self->matrix[j]) 
+            
+            
+            if(neighbors & ((_int64)1<<(63-i))) 
+            { 
+                if(!(colored & ((_int64)1<<(63-i))))
+                {
+                    colored = colored | ((_int64)1<<(63-i)); 
+                    if(!(coloring & (_int64)1<<(63-vertex)))
+                    {
+                        coloring = coloring | ((_int64)1<<(63-i)); 
+                        color1++;
+                    }
+                    else
+                        color0++;
+                    
+                    q.push(i);
+                }
+                else if( !(((coloring<<vertex)&mask) ^ ((coloring<<i)&mask)) )
+                {
                     return PyBool_FromLong(0);
-            }
+                }     
+            }   
         }
-    } 
+    }
+
+    _int64 vertices = self->vertices;
+    int result = 0;
+    do 
+    {
+        result += vertices % 2;
+    } while( vertices = vertices >> 1 );
+    if(color0 > 0 && result != color0 + color1)
+    {
+        return PyBool_FromLong(0);
+    }
+
+    int sum = 0;
+    for(int i = 1; i < 64; i++)
+    {
+        _int64 neighbours = self->matrix[i];
+        int result = 0;
+        for(int j = 0; j < i; j++ )
+        {
+            if(neighbours & ((_int64)1 << (63 - j)))
+                sum++;
+        }
+    }
+
+    if(sum != color0*color1)
+    {
+        return PyBool_FromLong(0);
+    }
+        
     return PyBool_FromLong(1);
 }
 
-static PyObject *
-Largest_richcompare(AdjacencyMatrix *self, AdjacencyMatrix *other, int op)
+static PyObject *Largest_richcompare(AdjacencyMatrix *self, AdjacencyMatrix *other, int op)
 {
     PyObject *result = NULL;
     result = Py_True;
@@ -275,6 +354,7 @@ Largest_richcompare(AdjacencyMatrix *self, AdjacencyMatrix *other, int op)
 }
 
 static PyMethodDef AdjacencyMatrixMethods[] = {
+    { "matrix", (PyCFunction)matrix, METH_VARARGS, "Returns number of vertices."},
     { "number_of_vertices", (PyCFunction)number_of_vertices, METH_NOARGS, "Returns number of vertices."},
     { "vertices", (PyCFunction)vertices, METH_NOARGS, "Returns a set of all vertices."},
     { "vertex_degree", (PyCFunction)vertex_degree, METH_VARARGS, "Returns degree of a given vertex."},

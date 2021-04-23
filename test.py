@@ -169,6 +169,12 @@ def test_of_operation_is_complete_bipartite( structure, g6_sequence ):
         try:
             g1, g2 = graphs.Graph( g6 ), structure( g6 )
             if g1.is_complete_bipartite() != g2.is_complete_bipartite():
+                print(format(g2.matrix(0), "064b"))
+                print(format(g2.matrix(1), "064b"))
+                print(format(g2.matrix(2), "064b"))
+                print(format(g2.matrix(3), "064b"))
+                print(g1.is_complete_bipartite())
+                print(g2.is_complete_bipartite())
                 print_error_and_quit( f"błędny wynik operacji dla grafu {g6}" )
         except Exception as e:
             print_error_and_quit( f"podczas testu na grafie {g6} wystąpił wyjątek {e}" )
@@ -339,6 +345,10 @@ def test_structure( structure, g6_sequence ):
             if g.edges() != h.edges():
                 print(g.edges())
                 print(h.edges())
+
+                print(format(h.matrix(0), "064b"))
+                print(format(h.matrix(1), "064b"))
+                print(format(h.matrix(2), "064b"))
                 
                 print_error_and_quit( f"błąd funkcji edges() dla grafu {g6}" )
         except Exception as e:
@@ -349,6 +359,8 @@ def test_structure( structure, g6_sequence ):
             for u in range( 64 ):
                 for v in range( u ):
                     if g.is_edge( u, v ) != h.is_edge( u, v ):
+                        print(g.is_edge(u, v))
+                        print(h.is_edge(u, v))
                         print_error_and_quit( f"błąd funkcji is_edge( {u}, {v} ) dla grafu {g6}" )
         except Exception as e:
             print_error_and_quit( f"podczas testu funkcji is_edge() dla grafu {g6} wystąpił wyjątek {e}" )
@@ -357,6 +369,8 @@ def test_structure( structure, g6_sequence ):
         try:
             for u in range( g.number_of_vertices() ):
                 if g.vertex_degree( u ) != h.vertex_degree( u ):
+                    print(g.vertex_degree(u))
+                    print(h.vertex_degree(u))
                     print_error_and_quit( f"błąd funkcji vertex_degree( {u} ) dla grafu {g6}" )
         except Exception as e:
             print_error_and_quit( f"podczas testu funkcji vertex_degree() dla grafu {g6} wystąpił wyjątek {e}" )
@@ -365,6 +379,8 @@ def test_structure( structure, g6_sequence ):
         try:
             for u in range( g.number_of_vertices() ):
                 if g.vertex_neighbors( u ) != h.vertex_neighbors( u ):
+                    print(g.vertex_neighbors(u))
+                    print(h.vertex_neighbors(u))
                     print_error_and_quit( f"błąd funkcji vertex_neighbors( {u} ) dla grafu {g6}" )
         except Exception as e:
             print_error_and_quit( f"podczas testu funkcji vertex_neighbors() dla grafu {g6} wystąpił wyjątek {e}" )
@@ -376,6 +392,14 @@ def test_structure( structure, g6_sequence ):
                     g.delete_vertex( u )
                     h.delete_vertex( u )
                     if g != h:
+                        print(g.edges())
+                        print(g.vertices())
+                        print(h.edges())
+                        print(h.vertices())
+                        print(format(h.matrix(0), "064b"))
+                        print(format(h.matrix(1), "064b"))
+                        print(format(h.matrix(2), "064b"))
+                        
                         print_error_and_quit( f"błąd funkcji delete_vertex( {u} ) dla grafu {g6}" )
                 else:
                     g.add_vertex( u )
